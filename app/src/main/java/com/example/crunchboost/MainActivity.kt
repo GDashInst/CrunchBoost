@@ -3,18 +3,24 @@ package com.example.crunchboost
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.HorizontalScrollView
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.SeekBar
@@ -48,6 +54,7 @@ class MainActivity : Activity() {
     private lateinit var audioManager: AudioManager
     private val handler = Handler(Looper.getMainLooper())
     private var running = false
+    private var selectedPreset: Preset? = null
 
     private lateinit var routeText: TextView
     private lateinit var statusText: TextView
@@ -78,6 +85,7 @@ class MainActivity : Activity() {
             } else {
                 "● Live · %d Hz".format(sr)
             }
+            statusText.setTextColor(TEAL)
             handler.postDelayed(this, 2000)
         }
     }
@@ -115,7 +123,7 @@ class MainActivity : Activity() {
         if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
             startEngine()
         } else {
-            statusText.text = "Microphone permission is needed to hear your food."
+            setStatus("Microphone permission is needed to hear your food.", ERROR)
         }
     }
 
@@ -127,7 +135,7 @@ class MainActivity : Activity() {
             return
         }
         if (currentRoute() == Route.SPEAKER) {
-            statusText.text = "Plug in headphones first — through the speaker it will howl with feedback."
+            setStatus("Plug in headphones first — through the speaker it will howl with feedback.", ERROR)
             return
         }
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
@@ -141,11 +149,11 @@ class MainActivity : Activity() {
         pushParams()
         if (CrunchEngine.nativeStart()) {
             running = true
-            startButton.text = "Stop"
-            statusText.text = "Starting…"
+            styleStartButton()
+            setStatus("Starting…", TEXT_2)
             handler.postDelayed(latencyPoll, 700)
         } else {
-            statusText.text = "Couldn't open the audio streams (see logcat, tag CrunchEngine)."
+            setStatus("Couldn't open the audio streams (see logcat, tag CrunchEngine).", ERROR)
         }
     }
 
@@ -153,8 +161,13 @@ class MainActivity : Activity() {
         CrunchEngine.nativeStop()
         running = false
         handler.removeCallbacks(latencyPoll)
-        startButton.text = "Start"
-        statusText.text = "Stopped"
+        styleStartButton()
+        setStatus("Stopped", TEXT_2)
+    }
+
+    private fun setStatus(text: String, color: Int) {
+        statusText.text = text
+        statusText.setTextColor(color)
     }
 
     private fun pushParams() {
@@ -172,7 +185,7 @@ class MainActivity : Activity() {
         air.update(p.airDb)
         snap.update(p.snap)
         gate.update(p.gateDb)
-        presetButtons.forEachIndexed { i, b -> b.alpha = if (presets[i] == p) 1f else 0.55f }
+        selectPreset(p)
         pushParams()
     }
 
@@ -202,21 +215,60 @@ class MainActivity : Activity() {
         if (!::routeText.isInitialized) return
         when (currentRoute()) {
             Route.WIRED -> {
-                routeText.text = "✓ Wired headphones — lowest latency"
-                routeText.setTextColor(Color.rgb(120, 220, 140))
+                routeText.text = "✓  Wired headphones — lowest latency"
+                routeText.setTextColor(TEAL)
             }
             Route.BLUETOOTH -> {
-                routeText.text = "⚠ Bluetooth — expect 100–300 ms of delay (sounds like an echo). Wired is much better."
-                routeText.setTextColor(Color.rgb(250, 200, 90))
+                routeText.text = "⚠  Bluetooth — expect 100–300 ms of delay (sounds like an echo). Wired is much better."
+                routeText.setTextColor(WARN)
             }
             Route.SPEAKER -> {
-                routeText.text = "✕ No headphones detected — plug some in"
-                routeText.setTextColor(Color.rgb(250, 110, 100))
+                routeText.text = "✕  No headphones detected — plug some in"
+                routeText.setTextColor(ERROR)
                 if (running) {
                     stopEngine()
-                    statusText.text = "Stopped: headphones were disconnected."
+                    setStatus("Stopped: headphones were disconnected.", ERROR)
                 }
             }
+        }
+    }
+
+    // ---------------------------------------------------------------- styling helpers
+
+    private fun dp(v: Int) = (v * resources.displayMetrics.density).roundToInt()
+
+    private fun rounded(fill: Int, stroke: Int = Color.TRANSPARENT, strokeDp: Int = 0, radiusDp: Int = 28) =
+        GradientDrawable().apply {
+            cornerRadius = dp(radiusDp).toFloat()
+            setColor(fill)
+            if (strokeDp > 0) setStroke(dp(strokeDp), stroke)
+        }
+
+    private fun withRipple(content: Drawable): Drawable =
+        RippleDrawable(ColorStateList.valueOf(RIPPLE), content, null)
+
+    private fun styleStartButton() {
+        if (running) {
+            startButton.text = "Stop"
+            startButton.setTextColor(TEAL)
+            startButton.background = withRipple(rounded(Color.BLACK, TEAL, 2))
+        } else {
+            startButton.text = "Start"
+            startButton.setTextColor(Color.BLACK)
+            startButton.background = withRipple(
+                GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(BLUE, TEAL)).apply {
+                    cornerRadius = dp(28).toFloat()
+                },
+            )
+        }
+    }
+
+    private fun selectPreset(p: Preset?) {
+        selectedPreset = p
+        presetButtons.forEachIndexed { i, b ->
+            val on = presets[i] == p
+            b.setTextColor(if (on) TEAL else TEXT_1)
+            b.background = withRipple(rounded(SURFACE, if (on) TEAL else OUTLINE, if (on) 2 else 1, 20))
         }
     }
 
@@ -231,11 +283,28 @@ class MainActivity : Activity() {
         private val fmt: (Float) -> String,
         initial: Float,
     ) {
-        val labelView = TextView(this@MainActivity).apply {
-            setTextColor(Color.WHITE)
+        private val nameView = TextView(this@MainActivity).apply {
+            text = label
+            setTextColor(TEXT_1)
             textSize = 15f
         }
-        val bar = SeekBar(this@MainActivity).apply { max = STEPS }
+        private val valueView = TextView(this@MainActivity).apply {
+            setTextColor(TEAL)
+            textSize = 15f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.END
+        }
+        val row = LinearLayout(this@MainActivity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(nameView, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            addView(valueView)
+        }
+        val bar = SeekBar(this@MainActivity).apply {
+            max = STEPS
+            progressTintList = ColorStateList.valueOf(TEAL)
+            progressBackgroundTintList = ColorStateList.valueOf(TRACK)
+            thumbTintList = ColorStateList.valueOf(TEAL)
+        }
         var value: Float = initial
             private set
 
@@ -245,7 +314,7 @@ class MainActivity : Activity() {
                     if (!fromUser) return
                     value = fromT(progress / STEPS.toFloat())
                     refreshLabel()
-                    presetButtons.forEach { it.alpha = 0.55f }
+                    if (this@Param !== volume) selectPreset(null)
                     pushParams()
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
@@ -263,93 +332,126 @@ class MainActivity : Activity() {
         private fun toT(v: Float) = if (logScale) ln(v / lo) / ln(hi / lo) else (v - lo) / (hi - lo)
         private fun fromT(t: Float) = if (logScale) lo * (hi / lo).pow(t) else lo + t * (hi - lo)
         private fun refreshLabel() {
-            labelView.text = "$label  ·  ${fmt(value)}"
+            valueView.text = fmt(value)
         }
     }
 
     @Suppress("DEPRECATION")
     private fun buildUi(): View {
-        val density = resources.displayMetrics.density
-        fun px(dp: Int) = (dp * density).roundToInt()
         val hz: (Float) -> String = { if (it >= 1000f) "%.1f kHz".format(it / 1000f) else "%.0f Hz".format(it) }
         val db: (Float) -> String = { "%+.0f dB".format(it) }
 
-        lowCut = Param("Low cut (removes jaw boom)", 40f, 800f, true, hz, 200f)
+        lowCut = Param("Low cut (jaw boom)", 40f, 800f, true, hz, 200f)
         crunchFreq = Param("Crunch frequency", 1500f, 10000f, true, hz, 4000f)
         crunchBoost = Param("Crunch boost", 0f, 15f, false, db, 9f)
         air = Param("Air / sparkle", 0f, 12f, false, db, 4f)
-        snap = Param("Snap (attack of each bite)", 0f, 1f, false, { "${(it * 100).roundToInt()}%" }, 0.6f)
+        snap = Param("Snap", 0f, 1f, false, { "${(it * 100).roundToInt()}%" }, 0.6f)
         gate = Param("Quiet between bites", -80f, -30f, false, { if (it <= -79.5f) "off" else "%.0f dB".format(it) }, -55f)
         volume = Param("Volume", -12f, 30f, false, db, 6f)
 
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(px(20), px(16), px(20), px(32))
+            setPadding(dp(20), dp(8), dp(20), dp(32))
         }
-        fun text(s: String, size: Float, color: Int = Color.WHITE, bold: Boolean = false, top: Int = 0) =
+        fun text(s: String, size: Float, color: Int = TEXT_1, bold: Boolean = false, top: Int = 0, parent: LinearLayout = col) =
             TextView(this).apply {
                 text = s
                 textSize = size
                 setTextColor(color)
                 if (bold) typeface = Typeface.DEFAULT_BOLD
-                setPadding(0, px(top), 0, 0)
-            }.also { col.addView(it) }
+                setPadding(0, dp(top), 0, 0)
+            }.also { parent.addView(it) }
+        fun card() = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = rounded(SURFACE, OUTLINE, 1, 20)
+            setPadding(dp(16), dp(8), dp(16), dp(16))
+        }.also {
+            col.addView(it, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                topMargin = dp(12)
+            })
+        }
 
-        text("CrunchBoost", 30f, bold = true)
-        text("Your mic → crunch EQ → your ears, live.", 15f, Color.rgb(180, 180, 190), top = 4)
+        // Header: logo + wordmark
+        col.addView(ImageView(this).apply {
+            setImageResource(R.drawable.logo)
+            adjustViewBounds = true
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "CrunchBoost logo"
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(130)).apply { topMargin = dp(8) })
+        text("CrunchBoost", 30f, bold = true).apply { gravity = Gravity.CENTER_HORIZONTAL; letterSpacing = 0.02f }
+        text("Your mic → crunch EQ → your ears, live.", 15f, TEXT_2, top = 2).gravity = Gravity.CENTER_HORIZONTAL
 
-        routeText = text("", 14f, top = 16)
+        routeText = text("", 14f, top = 20)
 
         startButton = Button(this).apply {
-            text = "Start"
             textSize = 18f
+            typeface = Typeface.DEFAULT_BOLD
+            isAllCaps = false
+            stateListAnimator = null
             setOnClickListener { onStartStopClicked() }
         }
-        col.addView(startButton, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, px(64)).apply {
-            topMargin = px(12)
+        col.addView(startButton, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(60)).apply {
+            topMargin = dp(12)
         })
-        statusText = text("Stopped", 14f, Color.rgb(180, 180, 190), top = 6)
+        styleStartButton()
+        statusText = text("Stopped", 14f, TEXT_2, top = 8)
 
+        val abCard = card()
         bypassSwitch = Switch(this).apply {
             text = "A/B: hear the raw mic (bypass)"
             textSize = 15f
-            setTextColor(Color.WHITE)
-            setPadding(0, px(16), 0, px(4))
+            setTextColor(TEXT_1)
+            thumbTintList = ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                intArrayOf(TEAL, TEXT_2),
+            )
+            trackTintList = ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                intArrayOf(TEAL_DIM, TRACK),
+            )
+            setPadding(0, dp(8), 0, 0)
             setOnCheckedChangeListener { _, _ -> pushParams() }
         }
-        col.addView(bypassSwitch)
+        abCard.addView(bypassSwitch)
 
-        text("Presets", 18f, bold = true, top = 20)
+        text("Presets", 18f, bold = true, top = 24)
         val presetRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         presets.forEach { p ->
             val b = Button(this).apply {
                 text = p.name
                 isAllCaps = false
+                stateListAnimator = null
+                setPadding(dp(18), 0, dp(18), 0)
                 setOnClickListener { applyPreset(p) }
             }
             presetButtons += b
-            presetRow.addView(b)
+            presetRow.addView(b, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(44)).apply {
+                marginEnd = dp(8)
+            })
         }
         col.addView(HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
+            setPadding(0, dp(10), 0, 0)
             addView(presetRow)
         })
 
-        text("Fine-tune", 18f, bold = true, top = 20)
+        text("Fine-tune", 18f, bold = true, top = 24)
+        val tuneCard = card()
         for (p in listOf(lowCut, crunchFreq, crunchBoost, air, snap, gate, volume)) {
-            p.labelView.setPadding(0, px(12), 0, 0)
-            col.addView(p.labelView)
-            col.addView(p.bar)
+            p.row.setPadding(0, dp(12), 0, dp(2))
+            tuneCard.addView(p.row)
+            tuneCard.addView(p.bar)
         }
 
         text(
             "Tips: wired earbuds with an inline mic work best — clip the mic near your jaw. " +
                 "Start with the volume low and raise it slowly. Flip the bypass switch mid-bite to hear the difference.",
-            13f, Color.rgb(150, 150, 160), top = 24,
+            13f, TEXT_3, top = 24,
         )
 
         return ScrollView(this).apply {
-            setBackgroundColor(Color.rgb(18, 18, 22))
+            setBackgroundColor(Color.BLACK)
+            isVerticalScrollBarEnabled = false
             addView(col)
             // Android 15 draws edge-to-edge; keep content clear of the system bars.
             setOnApplyWindowInsetsListener { v, insets ->
@@ -366,5 +468,19 @@ class MainActivity : Activity() {
         private const val REQ_MIC = 1
         private const val STEPS = 1000
         private const val TYPE_BLE_HEADSET = 26 // AudioDeviceInfo.TYPE_BLE_HEADSET (API 31)
+
+        // AMOLED palette: true black base, brand teal/blue from the logo.
+        private const val TEAL = 0xFF20D2C1.toInt()
+        private const val TEAL_DIM = 0x8020D2C1.toInt()
+        private const val BLUE = 0xFF0971D3.toInt()
+        private const val SURFACE = 0xFF0A0A0C.toInt()
+        private const val OUTLINE = 0xFF222228.toInt()
+        private const val TRACK = 0xFF2A2A31.toInt()
+        private const val RIPPLE = 0x4020D2C1
+        private const val TEXT_1 = 0xFFF2F2F5.toInt()
+        private const val TEXT_2 = 0xFF9A9AA5.toInt()
+        private const val TEXT_3 = 0xFF6B6B75.toInt()
+        private const val WARN = 0xFFFAC85A.toInt()
+        private const val ERROR = 0xFFFA6E64.toInt()
     }
 }

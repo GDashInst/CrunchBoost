@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="teal">#FF20D2C1</color>
+    <color name="blue">#FF0971D3</color>
+    <!-- Launcher icon background, matching the original logo artwork -->
+    <color name="icon_background">#FF313946</color>
+</resources>
