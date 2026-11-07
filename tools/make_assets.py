@@ -25,11 +25,11 @@ os.makedirs(f'{res}/drawable-nodpi', exist_ok=True)
 w = 900
 crop.resize((w, round(crop.height * w / crop.width)), Image.LANCZOS).save(f'{res}/drawable-nodpi/logo.png', optimize=True)
 
-# Adaptive icon layers (108dp canvas, logo ~62dp wide, centred in the safe zone)
-mono_src = crop.split()[3]
+# Adaptive icon foreground (108dp canvas). Logo is 74dp wide: only the flat
+# ends of the waveform reach the edge of a circular mask; all the detail stays visible.
 for name, scale in [('mdpi', 1), ('hdpi', 1.5), ('xhdpi', 2), ('xxhdpi', 3), ('xxxhdpi', 4)]:
     size = round(108 * scale)
-    lw = round(62 * scale)
+    lw = round(74 * scale)
     lh = round(crop.height * lw / crop.width)
     logo = crop.resize((lw, lh), Image.LANCZOS)
     canvas = Image.new('RGBA', (size, size), (0, 0, 0, 0))
@@ -37,9 +37,4 @@ for name, scale in [('mdpi', 1), ('hdpi', 1.5), ('xhdpi', 2), ('xxhdpi', 3), ('x
     d = f'{res}/mipmap-{name}'
     os.makedirs(d, exist_ok=True)
     canvas.save(f'{d}/ic_launcher_foreground.png', optimize=True)
-    # Monochrome layer for Android 13+ themed icons
-    m = mono_src.resize((lw, lh), Image.LANCZOS)
-    mono = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-    mono.paste(Image.new('RGBA', (lw, lh), (255, 255, 255, 255)), ((size - lw) // 2, (size - lh) // 2), m)
-    mono.save(f'{d}/ic_launcher_monochrome.png', optimize=True)
 print('bg colour #%02X%02X%02X' % tuple(int(round(c * 255)) for c in bg))
