@@ -19,7 +19,6 @@ import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
-import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -32,21 +31,11 @@ import kotlin.math.roundToInt
 
 class MainActivity : Activity() {
 
-    private data class Preset(val name: String, val crunchDb: Float)
-
-    private val presets = listOf(
-        Preset("Extra crunch", 9f),
-        Preset("Crispy greens", 7f),
-        Preset("Fizzy drink", 6f),
-        Preset("Subtle", 4f),
-    )
-
     private enum class Route { WIRED, BLUETOOTH, SPEAKER }
 
     private lateinit var audioManager: AudioManager
     private val handler = Handler(Looper.getMainLooper())
     private var running = false
-    private var selectedPreset: Preset? = null
 
     private lateinit var routeText: TextView
     private lateinit var statusText: TextView
@@ -54,7 +43,6 @@ class MainActivity : Activity() {
     private lateinit var bypassSwitch: Switch
     private lateinit var paperSwitch: Switch
     private lateinit var crackleSwitch: Switch
-    private val presetButtons = mutableListOf<Button>()
 
     private lateinit var crunchBoost: Param
     private lateinit var volume: Param
@@ -86,7 +74,6 @@ class MainActivity : Activity() {
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(buildUi())
-        applyPreset(presets[0])
     }
 
     override fun onStart() {
@@ -160,18 +147,12 @@ class MainActivity : Activity() {
     }
 
     private fun pushParams() {
-        if (!::volume.isInitialized || !::crackleSwitch.isInitialized) return
+        if (!::volume.isInitialized || !::crackleSwitch.isInitialized || !::bypassSwitch.isInitialized) return
         CrunchEngine.nativeSetParams(
             LOW_CUT_HZ, CRUNCH_HZ, crunchBoost.value, AIR_DB,
             SNAP, GATE_DB, volume.value, bypassSwitch.isChecked,
             paperSwitch.isChecked, crackleSwitch.isChecked,
         )
-    }
-
-    private fun applyPreset(p: Preset) {
-        crunchBoost.update(p.crunchDb)
-        selectPreset(p)
-        pushParams()
     }
 
     // ---------------------------------------------------------------- routing
@@ -248,15 +229,6 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun selectPreset(p: Preset?) {
-        selectedPreset = p
-        presetButtons.forEachIndexed { i, b ->
-            val on = presets[i] == p
-            b.setTextColor(if (on) TEAL else TEXT_1)
-            b.background = withRipple(rounded(SURFACE, if (on) TEAL else OUTLINE, if (on) 2 else 1, 20))
-        }
-    }
-
     private fun styledSwitch(label: String) = Switch(this).apply {
         text = label
         textSize = 15f
@@ -313,7 +285,6 @@ class MainActivity : Activity() {
                     if (!fromUser) return
                     value = fromT(progress / STEPS.toFloat())
                     refreshLabel()
-                    if (this@Param !== volume) selectPreset(null)
                     pushParams()
                 }
                 override fun onStartTrackingTouch(sb: SeekBar?) {}
@@ -339,8 +310,8 @@ class MainActivity : Activity() {
     private fun buildUi(): View {
         val db: (Float) -> String = { "%+.0f dB".format(it) }
 
-        crunchBoost = Param("Crunch boost", 0f, 15f, false, db, 9f)
-        volume = Param("Volume", -12f, 30f, false, db, 6f)
+        crunchBoost = Param("Crunch boost", 0f, 15f, false, db, DEFAULT_CRUNCH_DB)
+        volume = Param("Volume", -12f, 30f, false, db, DEFAULT_VOLUME_DB)
 
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -372,7 +343,6 @@ class MainActivity : Activity() {
             contentDescription = "CrunchBoost logo"
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(130)).apply { topMargin = dp(8) })
         text("CrunchBoost", 30f, bold = true).apply { gravity = Gravity.CENTER_HORIZONTAL; letterSpacing = 0.02f }
-        text("Your mic → crunch EQ → your ears, live.", 15f, TEXT_2, top = 2).gravity = Gravity.CENTER_HORIZONTAL
 
         routeText = text("", 14f, top = 20)
 
@@ -388,38 +358,6 @@ class MainActivity : Activity() {
         })
         styleStartButton()
         statusText = text("Stopped", 14f, TEXT_2, top = 8)
-
-        val abCard = card()
-        bypassSwitch = styledSwitch("A/B: hear the raw mic (bypass)").apply {
-            setPadding(0, dp(8), 0, 0)
-            setOnCheckedChangeListener { _, _ -> pushParams() }
-        }
-        abCard.addView(bypassSwitch)
-        text(
-            "Use sparingly — hearing the plain sound can weaken the illusion.",
-            13f, TEXT_2, top = 2, parent = abCard,
-        ).setPadding(0, dp(2), dp(56), 0)
-
-        text("Presets", 18f, bold = true, top = 24)
-        val presetRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        presets.forEach { p ->
-            val b = Button(this).apply {
-                text = p.name
-                isAllCaps = false
-                stateListAnimator = null
-                setPadding(dp(18), 0, dp(18), 0)
-                setOnClickListener { applyPreset(p) }
-            }
-            presetButtons += b
-            presetRow.addView(b, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(44)).apply {
-                marginEnd = dp(8)
-            })
-        }
-        col.addView(HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-            setPadding(0, dp(10), 0, 0)
-            addView(presetRow)
-        })
 
         text("Effects", 18f, bold = true, top = 24)
         val fxCard = card()
@@ -437,6 +375,7 @@ class MainActivity : Activity() {
             "Crunch layer",
             "Adds a burst of synthetic crackle to every bite — even soft foods.",
         )
+        paperSwitch.isChecked = DEFAULT_PAPER_MODE
         paperSwitch.setOnCheckedChangeListener { _, _ -> pushParams() }
         crackleSwitch.setOnCheckedChangeListener { _, _ -> pushParams() }
 
@@ -447,6 +386,17 @@ class MainActivity : Activity() {
             tuneCard.addView(p.row)
             tuneCard.addView(p.bar)
         }
+
+        val abCard = card()
+        bypassSwitch = styledSwitch("A/B: hear the raw mic (bypass)").apply {
+            setPadding(0, dp(8), 0, 0)
+            setOnCheckedChangeListener { _, _ -> pushParams() }
+        }
+        abCard.addView(bypassSwitch)
+        text(
+            "Use sparingly — hearing the plain sound can weaken the illusion.",
+            13f, TEXT_2, top = 2, parent = abCard,
+        ).setPadding(0, dp(2), dp(56), 0)
 
         text(
             "Tips: wired earbuds with an inline mic work best — clip the mic near your jaw. " +
@@ -480,6 +430,11 @@ class MainActivity : Activity() {
         private const val AIR_DB = 4f        // 9 kHz sparkle (when Paper mode is off)
         private const val SNAP = 0.82f       // attack emphasis on each bite
         private const val GATE_DB = -34f     // quiet between bites
+
+        // Defaults when the app opens.
+        private const val DEFAULT_PAPER_MODE = true
+        private const val DEFAULT_CRUNCH_DB = 12f
+        private const val DEFAULT_VOLUME_DB = 19f
 
         // AMOLED palette: true black base, brand teal/blue from the logo.
         private const val TEAL = 0xFF20D2C1.toInt()

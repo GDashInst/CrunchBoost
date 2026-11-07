@@ -41,7 +41,7 @@ Oboe output stream (low-latency, exclusive) ──► headphones
 
 ## Locked settings
 
-These were tuned by ear on a real phone and are fixed in `MainActivity.kt` (companion object): low cut 99 Hz, crunch frequency 4 kHz and air +4 dB (both apply only when Paper mode is off), snap 82%, and quiet-between-bites gate −34 dB. The adjustable sliders are Crunch boost and Volume. Presets now set only the crunch boost.
+These were tuned by ear on a real phone and are fixed in `MainActivity.kt` (companion object): low cut 99 Hz, crunch frequency 4 kHz and air +4 dB (both apply only when Paper mode is off), snap 82%, and quiet-between-bites gate −34 dB. The adjustable sliders are Crunch boost (default +12 dB) and Volume (default +19 dB); Paper mode is on by default.
 
 ## Effects (toggles)
 
