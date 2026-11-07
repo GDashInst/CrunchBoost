@@ -32,21 +32,13 @@ import kotlin.math.roundToInt
 
 class MainActivity : Activity() {
 
-    private data class Preset(
-        val name: String,
-        val lowCutHz: Float,
-        val crunchHz: Float,
-        val crunchDb: Float,
-        val airDb: Float,
-        val snap: Float,
-        val gateDb: Float,
-    )
+    private data class Preset(val name: String, val crunchDb: Float)
 
     private val presets = listOf(
-        Preset("Extra crunch", 200f, 4000f, 9f, 4f, 0.6f, -55f),
-        Preset("Crispy greens", 250f, 6000f, 7f, 6f, 0.4f, -55f),
-        Preset("Fizzy drink", 300f, 8000f, 6f, 9f, 0.2f, -60f),
-        Preset("Subtle", 150f, 3500f, 4f, 2f, 0.25f, -65f),
+        Preset("Extra crunch", 9f),
+        Preset("Crispy greens", 7f),
+        Preset("Fizzy drink", 6f),
+        Preset("Subtle", 4f),
     )
 
     private enum class Route { WIRED, BLUETOOTH, SPEAKER }
@@ -60,17 +52,11 @@ class MainActivity : Activity() {
     private lateinit var statusText: TextView
     private lateinit var startButton: Button
     private lateinit var bypassSwitch: Switch
-    private lateinit var exciterSwitch: Switch
     private lateinit var paperSwitch: Switch
     private lateinit var crackleSwitch: Switch
     private val presetButtons = mutableListOf<Button>()
 
-    private lateinit var lowCut: Param
-    private lateinit var crunchFreq: Param
     private lateinit var crunchBoost: Param
-    private lateinit var air: Param
-    private lateinit var snap: Param
-    private lateinit var gate: Param
     private lateinit var volume: Param
 
     private val deviceCallback = object : AudioDeviceCallback() {
@@ -176,19 +162,14 @@ class MainActivity : Activity() {
     private fun pushParams() {
         if (!::volume.isInitialized || !::crackleSwitch.isInitialized) return
         CrunchEngine.nativeSetParams(
-            lowCut.value, crunchFreq.value, crunchBoost.value, air.value,
-            snap.value, gate.value, volume.value, bypassSwitch.isChecked,
-            exciterSwitch.isChecked, paperSwitch.isChecked, crackleSwitch.isChecked,
+            LOW_CUT_HZ, CRUNCH_HZ, crunchBoost.value, AIR_DB,
+            SNAP, GATE_DB, volume.value, bypassSwitch.isChecked,
+            paperSwitch.isChecked, crackleSwitch.isChecked,
         )
     }
 
     private fun applyPreset(p: Preset) {
-        lowCut.update(p.lowCutHz)
-        crunchFreq.update(p.crunchHz)
         crunchBoost.update(p.crunchDb)
-        air.update(p.airDb)
-        snap.update(p.snap)
-        gate.update(p.gateDb)
         selectPreset(p)
         pushParams()
     }
@@ -341,13 +322,6 @@ class MainActivity : Activity() {
             update(initial)
         }
 
-        /** Greys the slider out when a mode makes it irrelevant (e.g. Paper mode). */
-        fun setActive(active: Boolean) {
-            bar.isEnabled = active
-            row.alpha = if (active) 1f else 0.35f
-            bar.alpha = if (active) 1f else 0.35f
-        }
-
         fun update(v: Float) {
             value = v.coerceIn(lo, hi)
             bar.progress = (toT(value) * STEPS).roundToInt()
@@ -363,15 +337,9 @@ class MainActivity : Activity() {
 
     @Suppress("DEPRECATION")
     private fun buildUi(): View {
-        val hz: (Float) -> String = { if (it >= 1000f) "%.1f kHz".format(it / 1000f) else "%.0f Hz".format(it) }
         val db: (Float) -> String = { "%+.0f dB".format(it) }
 
-        lowCut = Param("Low cut (jaw boom)", 40f, 800f, true, hz, 200f)
-        crunchFreq = Param("Crunch frequency", 1500f, 10000f, true, hz, 4000f)
         crunchBoost = Param("Crunch boost", 0f, 15f, false, db, 9f)
-        air = Param("Air / sparkle", 0f, 12f, false, db, 4f)
-        snap = Param("Snap", 0f, 1f, false, { "${(it * 100).roundToInt()}%" }, 0.6f)
-        gate = Param("Quiet between bites", -80f, -30f, false, { if (it <= -79.5f) "off" else "%.0f dB".format(it) }, -55f)
         volume = Param("Volume", -12f, 30f, false, db, 6f)
 
         val col = LinearLayout(this).apply {
@@ -465,25 +433,16 @@ class MainActivity : Activity() {
             "Paper mode",
             "One broad boost above 2 kHz, like the original Pringles study. Uses the Crunch boost amount.",
         )
-        exciterSwitch = effectToggle(
-            "Harmonic exciter",
-            "Generates fresh high frequencies that your mic misses.",
-        )
         crackleSwitch = effectToggle(
             "Crunch layer",
             "Adds a burst of synthetic crackle to every bite — even soft foods.",
         )
-        paperSwitch.setOnCheckedChangeListener { _, on ->
-            crunchFreq.setActive(!on)
-            air.setActive(!on)
-            pushParams()
-        }
-        exciterSwitch.setOnCheckedChangeListener { _, _ -> pushParams() }
+        paperSwitch.setOnCheckedChangeListener { _, _ -> pushParams() }
         crackleSwitch.setOnCheckedChangeListener { _, _ -> pushParams() }
 
         text("Fine-tune", 18f, bold = true, top = 24)
         val tuneCard = card()
-        for (p in listOf(lowCut, crunchFreq, crunchBoost, air, snap, gate, volume)) {
+        for (p in listOf(crunchBoost, volume)) {
             p.row.setPadding(0, dp(12), 0, dp(2))
             tuneCard.addView(p.row)
             tuneCard.addView(p.bar)
@@ -514,6 +473,13 @@ class MainActivity : Activity() {
         private const val REQ_MIC = 1
         private const val STEPS = 1000
         private const val TYPE_BLE_HEADSET = 26 // AudioDeviceInfo.TYPE_BLE_HEADSET (API 31)
+
+        // Locked sound settings (tuned by ear on a real phone).
+        private const val LOW_CUT_HZ = 99f   // removes jaw boom
+        private const val CRUNCH_HZ = 4000f  // crunch peak (when Paper mode is off)
+        private const val AIR_DB = 4f        // 9 kHz sparkle (when Paper mode is off)
+        private const val SNAP = 0.82f       // attack emphasis on each bite
+        private const val GATE_DB = -34f     // quiet between bites
 
         // AMOLED palette: true black base, brand teal/blue from the logo.
         private const val TEAL = 0xFF20D2C1.toInt()

@@ -17,7 +17,6 @@ object CrunchEngine {
         gateDb: Float,
         outputDb: Float,
         bypass: Boolean,
-        exciter: Boolean,
         paper: Boolean,
         crackle: Boolean,
     )

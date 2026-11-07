@@ -24,8 +24,8 @@ Java_com_example_crunchboost_CrunchEngine_nativeSetParams(JNIEnv*, jobject, jflo
                                                           jfloat crunchHz, jfloat crunchDb,
                                                           jfloat airDb, jfloat transient,
                                                           jfloat gateDb, jfloat outputDb,
-                                                          jboolean bypass, jboolean exciter,
-                                                          jboolean paper, jboolean crackle) {
+                                                          jboolean bypass, jboolean paper,
+                                                          jboolean crackle) {
     crunch::Params p;
     p.lowCutHz = lowCutHz;
     p.crunchHz = crunchHz;
@@ -35,7 +35,6 @@ Java_com_example_crunchboost_CrunchEngine_nativeSetParams(JNIEnv*, jobject, jflo
     p.gateDb = gateDb;
     p.outputDb = outputDb;
     p.bypass = bypass == JNI_TRUE;
-    p.exciter = exciter == JNI_TRUE;
     p.paper = paper == JNI_TRUE;
     p.crackle = crackle == JNI_TRUE;
     engine().setParams(p);

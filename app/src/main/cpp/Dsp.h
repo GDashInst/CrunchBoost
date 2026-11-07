@@ -4,7 +4,6 @@
 // Chain:  mic -> 4th-order high-pass (kills jaw/occlusion boom)
 //             -> EQ: either peak "crunch" + 9 kHz "air" shelf,
 //                or Paper mode: one broad shelf from 2 kHz up (as in Zampini & Spence 2004)
-//             -> [optional] harmonic exciter (synthesises new highs the mic missed)
 //             -> transient shaper ("snap": exaggerates the attack of each crunch)
 //             -> [optional] synthetic crunch layer (crackle bursts triggered by each bite)
 //             -> soft noise gate (keeps boosted room hiss down between bites)
@@ -30,7 +29,6 @@ struct Params {
     float gateDb    = -60.0f;   // gate threshold; <= -80 disables
     float outputDb  = 6.0f;     // output volume
     bool  bypass    = false;    // raw mic (for A/B comparison)
-    bool  exciter   = false;    // harmonic exciter
     bool  paper     = false;    // broad 2 kHz+ shelf instead of peak + air
     bool  crackle   = false;    // synthetic crunch layer
 };
@@ -103,28 +101,6 @@ private:
     float env = 0.0f, att = 0.0f, rel = 0.0f;
 };
 
-// Harmonic exciter: takes the 3–10 kHz band, full-wave rectifies it (which
-// creates new harmonics at roughly double the frequency), then keeps only what
-// lands above 5 kHz. Phone mics capture little up there, so this "fills in"
-// the top end that crispness depends on.
-class Exciter {
-public:
-    void prepare(float fs) {
-        bandHp.setHighPass(fs, 3000.0f, 0.707f);
-        bandLp.setLowPass(fs, std::min(10000.0f, 0.45f * fs), 0.707f);
-        outHp1.setHighPass(fs, std::min(5000.0f, 0.45f * fs), 0.5412f);
-        outHp2.setHighPass(fs, std::min(5000.0f, 0.45f * fs), 1.3066f);
-        bandHp.reset(); bandLp.reset(); outHp1.reset(); outHp2.reset();
-    }
-    float process(float x) {
-        const float band = bandLp.process(bandHp.process(x));
-        return outHp2.process(outHp1.process(std::fabs(band)));
-    }
-
-private:
-    Biquad bandHp, bandLp, outHp1, outHp2;
-};
-
 // Synthetic crunch layer: on each detected bite, fires a short burst of
 // random micro-clicks through two resonators, like tiny fractures.
 // Loosely inspired by Endo, Ino & Fujisaki (2016), where an artificial
@@ -175,7 +151,6 @@ public:
         fastEnv.setup(fs, 0.0005f, 0.020f);  // follows each crunch
         slowEnv.setup(fs, 0.020f, 0.200f);   // follows the overall level
         fastEnv.reset(); slowEnv.reset();
-        exciter.prepare(fs);
         crackle.prepare(fs);
         refractory = 0;
         gateOpen  = 1.0f - std::exp(-1.0f / (0.001f * fs));
@@ -207,8 +182,6 @@ public:
         float y = hp2.process(hp1.process(x));
         y = p.paper ? paperShelf.process(y) : shelf.process(peak.process(y));
 
-        if (p.exciter) y += kExciterMix * exciter.process(y);
-
         const float r = std::fabs(y);
         const float fast = fastEnv.process(r);
         const float slow = slowEnv.process(r);
@@ -239,7 +212,6 @@ public:
         return softClip(y * outGain);
     }
 
-    static constexpr float kExciterMix = 1.0f;
     static constexpr float kCrackleLevel = 7.0f;
 
 private:
@@ -249,7 +221,6 @@ private:
     Params p;
     Biquad hp1, hp2, peak, shelf, paperShelf;
     EnvelopeFollower fastEnv, slowEnv;
-    Exciter exciter;
     CrackleSynth crackle;
     int32_t refractory = 0;
     float transientAmt = 0.0f;

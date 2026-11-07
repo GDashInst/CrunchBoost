@@ -42,7 +42,6 @@ void CrunchEngine::setParams(const crunch::Params& p) {
     mShared.gateDb.store(p.gateDb, std::memory_order_relaxed);
     mShared.outputDb.store(p.outputDb, std::memory_order_relaxed);
     mShared.bypass.store(p.bypass, std::memory_order_relaxed);
-    mShared.exciter.store(p.exciter, std::memory_order_relaxed);
     mShared.paper.store(p.paper, std::memory_order_relaxed);
     mShared.crackle.store(p.crackle, std::memory_order_relaxed);
     mShared.version.fetch_add(1, std::memory_order_release);
@@ -58,7 +57,6 @@ crunch::Params CrunchEngine::loadParams() const {
     p.gateDb = mShared.gateDb.load(std::memory_order_relaxed);
     p.outputDb = mShared.outputDb.load(std::memory_order_relaxed);
     p.bypass = mShared.bypass.load(std::memory_order_relaxed);
-    p.exciter = mShared.exciter.load(std::memory_order_relaxed);
     p.paper = mShared.paper.load(std::memory_order_relaxed);
     p.crackle = mShared.crackle.load(std::memory_order_relaxed);
     return p;

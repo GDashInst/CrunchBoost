@@ -20,7 +20,7 @@ mic ──► Oboe input stream (VoiceRecognition preset: no noise suppression o
          │  non-blocking read inside the output callback
          ▼
    4th-order high-pass ──► peak EQ "crunch" ──► high shelf "air"
-         ──► transient shaper "snap" ──► soft gate ──► gain ──► soft limiter
+         ──► transient shaper "snap" ──► [crunch layer] ──► soft gate ──► gain ──► soft limiter
          ▼
 Oboe output stream (low-latency, exclusive) ──► headphones
 ```
@@ -39,10 +39,13 @@ Oboe output stream (low-latency, exclusive) ──► headphones
 - **Quiet between bites**: a gentle gate (−20 dB floor) that stops the boosted room hiss from hissing at you.
 - **Bypass**: flip it mid-bite. The effect is much easier to notice as a contrast.
 
+## Locked settings
+
+These were tuned by ear on a real phone and are fixed in `MainActivity.kt` (companion object): low cut 99 Hz, crunch frequency 4 kHz and air +4 dB (both apply only when Paper mode is off), snap 82%, and quiet-between-bites gate −34 dB. The adjustable sliders are Crunch boost and Volume. Presets now set only the crunch boost.
+
 ## Effects (toggles)
 
 - **Paper mode**: replaces the crunch peak and air shelf with one broad high shelf from 2 kHz up, using the Crunch boost amount. This follows Zampini & Spence (2004), where boosting 2–20 kHz made chips seem crisper and fresher.
-- **Harmonic exciter**: full-wave rectifies the 3–10 kHz band to create new harmonics above 5 kHz, filling in the top end that phone mics barely capture.
 - **Crunch layer**: detects each bite's onset and adds a 50–140 ms burst of resonant micro-clicks that scales with the bite's loudness. This is loosely based on Endo, Ino & Fujisaki (2016), where an artificial crunchy chewing sound made soft foods seem stiffer.
 
 Research tip: hearing the unprocessed sound gives your brain a reference point, so use the bypass switch sparingly.
