@@ -60,6 +60,9 @@ class MainActivity : Activity() {
     private lateinit var statusText: TextView
     private lateinit var startButton: Button
     private lateinit var bypassSwitch: Switch
+    private lateinit var exciterSwitch: Switch
+    private lateinit var paperSwitch: Switch
+    private lateinit var crackleSwitch: Switch
     private val presetButtons = mutableListOf<Button>()
 
     private lateinit var lowCut: Param
@@ -171,10 +174,11 @@ class MainActivity : Activity() {
     }
 
     private fun pushParams() {
-        if (!::volume.isInitialized || !::bypassSwitch.isInitialized) return
+        if (!::volume.isInitialized || !::crackleSwitch.isInitialized) return
         CrunchEngine.nativeSetParams(
             lowCut.value, crunchFreq.value, crunchBoost.value, air.value,
             snap.value, gate.value, volume.value, bypassSwitch.isChecked,
+            exciterSwitch.isChecked, paperSwitch.isChecked, crackleSwitch.isChecked,
         )
     }
 
@@ -272,6 +276,20 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun styledSwitch(label: String) = Switch(this).apply {
+        text = label
+        textSize = 15f
+        setTextColor(TEXT_1)
+        thumbTintList = ColorStateList(
+            arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+            intArrayOf(TEAL, TEXT_2),
+        )
+        trackTintList = ColorStateList(
+            arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+            intArrayOf(TEAL_DIM, TRACK),
+        )
+    }
+
     // ---------------------------------------------------------------- UI
 
     /** A labelled slider. Frequency sliders use a log scale. */
@@ -321,6 +339,13 @@ class MainActivity : Activity() {
                 override fun onStopTrackingTouch(sb: SeekBar?) {}
             })
             update(initial)
+        }
+
+        /** Greys the slider out when a mode makes it irrelevant (e.g. Paper mode). */
+        fun setActive(active: Boolean) {
+            bar.isEnabled = active
+            row.alpha = if (active) 1f else 0.35f
+            bar.alpha = if (active) 1f else 0.35f
         }
 
         fun update(v: Float) {
@@ -397,22 +422,15 @@ class MainActivity : Activity() {
         statusText = text("Stopped", 14f, TEXT_2, top = 8)
 
         val abCard = card()
-        bypassSwitch = Switch(this).apply {
-            text = "A/B: hear the raw mic (bypass)"
-            textSize = 15f
-            setTextColor(TEXT_1)
-            thumbTintList = ColorStateList(
-                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                intArrayOf(TEAL, TEXT_2),
-            )
-            trackTintList = ColorStateList(
-                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                intArrayOf(TEAL_DIM, TRACK),
-            )
+        bypassSwitch = styledSwitch("A/B: hear the raw mic (bypass)").apply {
             setPadding(0, dp(8), 0, 0)
             setOnCheckedChangeListener { _, _ -> pushParams() }
         }
         abCard.addView(bypassSwitch)
+        text(
+            "Use sparingly — hearing the plain sound can weaken the illusion.",
+            13f, TEXT_2, top = 2, parent = abCard,
+        ).setPadding(0, dp(2), dp(56), 0)
 
         text("Presets", 18f, bold = true, top = 24)
         val presetRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
@@ -434,6 +452,34 @@ class MainActivity : Activity() {
             setPadding(0, dp(10), 0, 0)
             addView(presetRow)
         })
+
+        text("Effects", 18f, bold = true, top = 24)
+        val fxCard = card()
+        fun effectToggle(title: String, subtitle: String): Switch {
+            val sw = styledSwitch(title).apply { setPadding(0, dp(10), 0, 0) }
+            fxCard.addView(sw)
+            text(subtitle, 13f, TEXT_2, parent = fxCard).setPadding(0, dp(2), dp(56), dp(4))
+            return sw
+        }
+        paperSwitch = effectToggle(
+            "Paper mode",
+            "One broad boost above 2 kHz, like the original Pringles study. Uses the Crunch boost amount.",
+        )
+        exciterSwitch = effectToggle(
+            "Harmonic exciter",
+            "Generates fresh high frequencies that your mic misses.",
+        )
+        crackleSwitch = effectToggle(
+            "Crunch layer",
+            "Adds a burst of synthetic crackle to every bite — even soft foods.",
+        )
+        paperSwitch.setOnCheckedChangeListener { _, on ->
+            crunchFreq.setActive(!on)
+            air.setActive(!on)
+            pushParams()
+        }
+        exciterSwitch.setOnCheckedChangeListener { _, _ -> pushParams() }
+        crackleSwitch.setOnCheckedChangeListener { _, _ -> pushParams() }
 
         text("Fine-tune", 18f, bold = true, top = 24)
         val tuneCard = card()

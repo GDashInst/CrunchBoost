@@ -39,6 +39,14 @@ Oboe output stream (low-latency, exclusive) ──► headphones
 - **Quiet between bites**: a gentle gate (−20 dB floor) that stops the boosted room hiss from hissing at you.
 - **Bypass**: flip it mid-bite. The effect is much easier to notice as a contrast.
 
+## Effects (toggles)
+
+- **Paper mode**: replaces the crunch peak and air shelf with one broad high shelf from 2 kHz up, using the Crunch boost amount. This follows Zampini & Spence (2004), where boosting 2–20 kHz made chips seem crisper and fresher.
+- **Harmonic exciter**: full-wave rectifies the 3–10 kHz band to create new harmonics above 5 kHz, filling in the top end that phone mics barely capture.
+- **Crunch layer**: detects each bite's onset and adds a 50–140 ms burst of resonant micro-clicks that scales with the bite's loudness. This is loosely based on Endo, Ino & Fujisaki (2016), where an artificial crunchy chewing sound made soft foods seem stiffer.
+
+Research tip: hearing the unprocessed sound gives your brain a reference point, so use the bypass switch sparingly.
+
 ## Known limitations
 
 - **Latency.** You hear your own chewing through your jaw instantly, so any delay sounds like an echo. Pixels and recent Samsungs typically land around 10–25 ms round trip on wired headphones. Bluetooth adds 100–300 ms, and the app warns you about it.

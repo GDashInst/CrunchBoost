@@ -17,6 +17,9 @@ object CrunchEngine {
         gateDb: Float,
         outputDb: Float,
         bypass: Boolean,
+        exciter: Boolean,
+        paper: Boolean,
+        crackle: Boolean,
     )
     external fun nativeOutputLatencyMs(): Double
     external fun nativeSampleRate(): Int

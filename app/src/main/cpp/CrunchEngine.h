@@ -47,7 +47,7 @@ private:
     struct SharedParams {
         std::atomic<float> lowCutHz{180.0f}, crunchHz{4000.0f}, crunchDb{8.0f}, airDb{4.0f},
             transient{0.5f}, gateDb{-60.0f}, outputDb{6.0f};
-        std::atomic<bool> bypass{false};
+        std::atomic<bool> bypass{false}, exciter{false}, paper{false}, crackle{false};
         std::atomic<uint32_t> version{0};
     } mShared;
     uint32_t mSeenVersion = 0;
